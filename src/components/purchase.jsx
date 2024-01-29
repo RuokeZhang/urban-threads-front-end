@@ -1,8 +1,28 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, gql } from '@apollo/client';
 import "./purchase.css";
 
 const Purchase = () => {
+  const GET_PAGE_ITEMS = gql`
+  query GetItemsByPage($pageNumber: Int!, $size: Int!) {
+    itemsByPage(pageNumber: $pageNumber, sizeOfPage: $size) {
+      content {
+        id
+        itemName
+        description
+        price
+        stockQuantity
+        category
+      }
+      totalElements
+      totalPages
+      size
+      number
+    }
+  }
+
+`;
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const itemsPerPage = 12;
@@ -28,18 +48,22 @@ const Purchase = () => {
   const [items, setItems] = useState([]);
 
   const navigate = useNavigate();
+  const { loading, error, data } = useQuery(GET_PAGE_ITEMS, {
+    variables: { pageNumber: currentPage, size: itemsPerPage },
+  });
+
 
 
   useEffect(() => {
     const savedOrderDTOJSON = localStorage.getItem('orderDTO');
     const savedOrderDTO = savedOrderDTOJSON ? JSON.parse(savedOrderDTOJSON) : {};
-
-    fetch(`http://localhost:8080/urban-threads/items?pageNumber=${currentPage - 1}&sizeOfPage=${itemsPerPage}`)
-      .then(response => response.json())
-      .then(data => {
-        const itemList = data.content || [];
-        setTotalPages(data.totalPages); // 设置总页数
-
+    if(error){
+      console.log(error);
+      return;
+    }
+    if (data) {
+      const itemList = data.itemsByPage.content || [];
+      setTotalPages(data.itemsByPage.totalPages);
         const itemsCountRequested = savedOrderDTO.itemsCountRequested || itemList.reduce((acc, item) => {
           acc[item.id] = 0;
           return acc;
@@ -54,8 +78,9 @@ const Purchase = () => {
             return acc;
           }, {})
         }));
-      });
-  }, [currentPage]);
+      }
+
+  }, [data]);
 
 
   const handleQuantityChange = (itemId, quantity) => {
